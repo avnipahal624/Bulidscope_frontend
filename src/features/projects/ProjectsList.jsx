@@ -6,10 +6,49 @@ import { Btn, Confirm, DemoBanner, EmptyState, PageHead } from '../../components
 import { buildMissions, activeMission, missionProgress, coverageOf, evidenceQuality } from '../../lib/scoring';
 import { relativeTime } from '../../lib/format';
 import { DEMO_PROJECT } from '../../data/demo';
-
+import { listBackendProjects } from '../../services/projectsApi';
 export default function ProjectsList() {
   const { state, actions, pushToast } = useApp();
   const navigate = useNavigate();
+  const [backendProjects, setBackendProjects] = useState([]);
+  const [backendLoading, setBackendLoading] = useState(true);
+  const [backendError, setBackendError] = useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadProjects() {
+      try {
+        setBackendLoading(true);
+        setBackendError('');
+
+        const result = await listBackendProjects();
+        const projects = Array.isArray(result)
+          ? result
+          : Array.isArray(result?.value)
+            ? result.value
+            : [];
+
+        if (!cancelled) {
+          setBackendProjects(projects);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBackendError(error.message || 'Could not load backend projects.');
+        }
+      } finally {
+        if (!cancelled) {
+          setBackendLoading(false);
+        }
+      }
+    }
+
+    loadProjects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmReset, setConfirmReset] = useState(null); // 'demo' | 'clear'
 
@@ -18,7 +57,13 @@ export default function ProjectsList() {
     const active = activeMission(missions);
     return { p, active, progress: missionProgress(missions), coverage: coverageOf(p), quality: evidenceQuality(p) };
   });
+    const localBackendIds = new Set(
+    state.projects.map((p) => String(p.backendId || ''))
+  );
 
+  const visibleBackendProjects = backendProjects.filter(
+    (p) => !localBackendIds.has(String(p.id))
+  );
   return (
     <div>
       <PageHead
@@ -27,6 +72,46 @@ export default function ProjectsList() {
         description="Every investigation is a case file. Switch cases without losing evidence, risks, learning progress, or report history."
         actions={<Btn variant="primary" to="/projects/new"><Plus size={15} /> New investigation</Btn>}
       />
+            {backendLoading && (
+        <p className="small muted">Loading projects from backend...</p>
+      )}
+
+      {backendError && (
+        <div className="card card-tight">
+          <p className="small">
+            Backend projects could not be loaded: {backendError}
+          </p>
+        </div>
+      )}
+
+      {visibleBackendProjects.length > 0 && (
+        <div className="card mb16">
+          <h3>Projects from Backend</h3>
+          <p className="small muted">
+            These projects are loaded from your API. Your local workspace remains unchanged.
+          </p>
+
+          {visibleBackendProjects.map((p) => (
+            <div
+              key={p.id}
+              className="spread"
+              style={{
+                padding: '12px 0',
+                borderBottom: '1px solid var(--line)',
+                gap: 12,
+              }}
+            >
+              <div>
+                <strong>{p.name}</strong>
+                <p className="small muted mb0">
+                  {p.problem_statement || p.description || 'No description available.'}
+                </p>
+              </div>
+              <span className="badge">{p.status || 'Saved'}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="card">

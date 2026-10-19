@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Plus, Trash2, Save, ArrowLeft, Info } from 'lucide-react';
 import { useApp } from '../../app/store';
 import { Btn, Field, Hint, Notice, PageHead } from '../../components/ui';
 import { feature } from '../../lib/models';
 import { makeCaseId } from '../../lib/id';
+import { createBackendProject } from '../../services/projectsApi';
 
 const EMPTY = {
   name: '',
@@ -82,25 +83,45 @@ export default function ProjectForm({ mode = 'create' }) {
   const updateFeature = (fid, patch) => set({ features: draft.features.map((f) => (f.id === fid ? { ...f, ...patch } : f)) });
   const removeFeature = (fid) => set({ features: draft.features.filter((f) => f.id !== fid) });
 
-  const save = (e) => {
+  
+   const save = async (e) => {
     e?.preventDefault();
+    setError('');
+
     if (!draft.name.trim()) {
       setError('A project name is required before the case can be opened.');
       document.getElementById('project-name')?.focus();
       return;
     }
+
     const cleaned = {
       ...draft,
       features: draft.features.filter((f) => f.name.trim()),
     };
+
     if (mode === 'edit' && existing) {
       actions.updateProject(existing.id, cleaned, 'Project brief updated.');
       pushToast('Brief saved locally.');
       navigate(`/projects/${existing.id}`);
-    } else {
-      const p = actions.createProject(cleaned);
+      return;
+    }
+
+    try {
+      const backendProject = await createBackendProject(cleaned);
+
+      const p = actions.createProject({
+        ...cleaned,
+        backendId: backendProject.id,
+        backendCreatedAt: backendProject.created_at,
+      });
+
       pushToast(`Case ${p.caseId} opened. Investigation workspace ready.`);
       navigate(`/projects/${p.id}`);
+    } catch (err) {
+      setError(
+        err.message ||
+          'Could not save the project to the backend. Please try again.'
+      );
     }
   };
 
@@ -109,7 +130,7 @@ export default function ProjectForm({ mode = 'create' }) {
       <PageHead
         eyebrow={mode === 'edit' ? `Editing case ${existing?.caseId || ''}` : 'New case file'}
         title={mode === 'edit' ? 'Edit project brief' : 'Open a new investigation'}
-        description="A useful brief is specific about the problem, the user, and the demo outcome. Everything can be revised later — including after evidence contradicts the original idea."
+        description="A useful brief is specific about the problem, the user, and the demo outcome. Everything can be revised later â€” including after evidence contradicts the original idea."
         actions={<Btn variant="ghost" onClick={() => navigate(-1)}><ArrowLeft size={14} /> Back</Btn>}
       />
 
@@ -129,13 +150,13 @@ export default function ProjectForm({ mode = 'create' }) {
               </div>
               <label className="check" style={{ alignItems: 'center' }}>
                 <input type="checkbox" checked={guided} onChange={(e) => setGuided(e.target.checked)} />
-                <span><strong>Guided mode</strong> — show field explanations</span>
+                <span><strong>Guided mode</strong> â€” show field explanations</span>
               </label>
             </div>
 
             <FormSection num="01" title="Identity & constraints" note="What you are attempting, and the real limits around it.">
               <div className="form-grid">
-                <Field label="Project name" required hint={guided ? 'Concrete beats clever. “Kabadiwala Connect” tells a judge more than “EcoSync 3000”.' : undefined} htmlFor="project-name">
+                <Field label="Project name" required hint={guided ? 'Concrete beats clever. â€œKabadiwala Connectâ€ tells a judge more than â€œEcoSync 3000â€.' : undefined} htmlFor="project-name">
                   <input id="project-name" type="text" value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="e.g. Campus Ride Share" autoComplete="off" />
                 </Field>
                 <Field label="Hackathon name (if known)" hint={guided ? 'Optional. Adding it links the case to requirement mapping.' : undefined} htmlFor="hackathon-name">
@@ -153,11 +174,11 @@ export default function ProjectForm({ mode = 'create' }) {
 
             <FormSection num="02" title="The problem worth solving" note="Evidence starts with a precise problem, not a feature list.">
               <Field label="Problem statement" required hint={guided ? 'Who struggles, with what, and what happens as a result? One paragraph is enough.' : undefined} htmlFor="problem">
-                <textarea id="problem" rows={4} value={draft.problem} onChange={(e) => set({ problem: e.target.value })} placeholder="Households and small businesses can struggle to find reliable local waste collectors and verified recyclers…" />
+                <textarea id="problem" rows={4} value={draft.problem} onChange={(e) => set({ problem: e.target.value })} placeholder="Households and small businesses can struggle to find reliable local waste collectors and verified recyclersâ€¦" />
               </Field>
-              <CommaField id="users" label="Target users" value={draft.targetUsers} onChange={(v) => set({ targetUsers: v })} placeholder="Households, local collectors, recycling businesses" hint={guided ? 'Be specific. “Everyone” usually means no one is designed for.' : undefined} />
+              <CommaField id="users" label="Target users" value={draft.targetUsers} onChange={(v) => set({ targetUsers: v })} placeholder="Households, local collectors, recycling businesses" hint={guided ? 'Be specific. â€œEveryoneâ€ usually means no one is designed for.' : undefined} />
               <Field label="Proposed solution" required hint={guided ? 'Describe the workflow, not the technology. What changes for the user between before and after?' : undefined} htmlFor="solution">
-                <textarea id="solution" rows={4} value={draft.solution} onChange={(e) => set({ solution: e.target.value })} placeholder="A role-based platform connecting households, collectors, and recyclers…" />
+                <textarea id="solution" rows={4} value={draft.solution} onChange={(e) => set({ solution: e.target.value })} placeholder="A role-based platform connecting households, collectors, and recyclersâ€¦" />
               </Field>
               <Field label="Desired outcome" hint={guided ? "What should be true at the end of the hackathon, from a judge's point of view?" : undefined} htmlFor="outcome">
                 <textarea id="outcome" rows={2} value={draft.desiredOutcome} onChange={(e) => set({ desiredOutcome: e.target.value })} placeholder="A working end-to-end pickup workflow with persistent status changes and a traceable handoff record." />
@@ -242,7 +263,7 @@ export default function ProjectForm({ mode = 'create' }) {
               <ul style={{ listStyle: 'none', padding: 0, marginTop: 14 }} className="stack-sm">
                 {complete.checks.map(([label, ok]) => (
                   <li key={label} className="row" style={{ gap: 7, fontSize: 12 }}>
-                    <span className={`task-box ${ok ? 'done' : ''}`} aria-hidden="true">{ok ? '✓' : ''}</span>
+                    <span className={`task-box ${ok ? 'done' : ''}`} aria-hidden="true">{ok ? 'âœ“' : ''}</span>
                     <span className={ok ? '' : 'muted'}>{label}</span>
                   </li>
                 ))}
@@ -268,3 +289,4 @@ export default function ProjectForm({ mode = 'create' }) {
     </div>
   );
 }
+
