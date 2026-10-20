@@ -362,11 +362,11 @@ export default function PriorArtLab() {
         </>}
       />
 
-      <DemoBanner>
-        Repository and solution records below are simulated or manually entered. No live search provider is connected;
-        BuildScope has not queried GitHub, FishAPI, or any other source. Stars, licences, dates, and links are shown as
-        unknown where no verified value exists.
-      </DemoBanner>
+      {(repos.some((r) => r.demo) || solutions.some((item) => item.demo)) && (
+        <DemoBanner>
+          Demo records are simulated and are not live evidence. Use Search GitHub to retrieve public repository results; manually entered leads remain unverified until checked.
+        </DemoBanner>
+      )}
 
       <div className="grid g-2-1 mb16" style={{ alignItems: 'stretch' }}>
         <Card title="Search plan" eyebrow="Derived locally from your brief" className="mb0">
@@ -478,7 +478,7 @@ export default function PriorArtLab() {
 
           {repos.length === 0 ? (
             <div className="card"><EmptyState icon={Radar} title="No repository leads recorded" action={<Btn variant="primary" onClick={() => setModal({ type: 'repo' })}><Plus size={14} /> Add the first lead</Btn>}>
-              Search manually, then save what you find with the claim it supports. A live provider can be connected later without changing this workflow.
+              Search manually, then save what you find with the claim it supports. Use Search GitHub above to retrieve public repository results, or add a lead manually and record the evidence you checked.
             </EmptyState></div>
           ) : filtered.length === 0 ? (
             <div className="card"><EmptyState icon={Search} title="No records match these filters" action={<Btn variant="ghost" onClick={() => { setQ(''); setFilters({ language: '', overlap: '', licence: '', updated: '', platform: '' }); }}>Clear filters</Btn>}>
