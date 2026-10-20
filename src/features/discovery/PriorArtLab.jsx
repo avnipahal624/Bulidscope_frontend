@@ -267,14 +267,26 @@ export default function PriorArtLab() {
     updateComparison({ cells: { ...(comparison.cells || {}), [key]: value } });
   };
 
+  const searchText = (value) => {
+    if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
+    if (Array.isArray(value)) return value.map(searchText).filter(Boolean).join(' ');
+    if (value && typeof value === 'object') {
+      const preferred = value.name ?? value.label ?? value.title ?? value.value ?? value.text;
+      return preferred == null ? '' : searchText(preferred);
+    }
+    return '';
+  };
+  const featureNames = (p.features || []).map((item) => searchText(item?.name ?? item)).filter(Boolean);
+  const targetUser = searchText((p.targetUsers || [])[0]);
+  const stackItems = (p.stack || []).map(searchText).filter(Boolean);
   const searchPlan = [
-    p.name,
-    p.features[0]?.name ? `${p.features[0].name} ${p.targetUsers[0] || ''}` : null,
-    p.targetUsers[0] ? `${p.targetUsers[0]} ${p.features[0]?.name || 'platform'}` : null,
-    `${p.features.slice(0, 2).map((f) => f.name).join(' ')} github`.trim(),
-    `${p.stack.slice(0, 2).join(' ')} ${p.targetUsers[0] || 'app'}`.trim(),
-    p.solution ? p.solution.split(/\s+/).slice(0, 7).join(' ') : null,
-  ].filter(Boolean);
+    searchText(p.name),
+    featureNames[0] && targetUser ? `${featureNames[0]} ${targetUser}` : (featureNames[0] || targetUser),
+    targetUser && featureNames[0] ? `${targetUser} ${featureNames[0]}` : null,
+    featureNames.slice(0, 2).length ? `${featureNames.slice(0, 2).join(' ')} github` : null,
+    [stackItems.slice(0, 2).join(' '), targetUser || 'app'].filter(Boolean).join(' '),
+    searchText(p.solution).split(/\s+/).filter(Boolean).slice(0, 7).join(' ') || null,
+  ].map(searchText).filter(Boolean).filter((item, index, all) => all.indexOf(item) === index);
 
   const runLiveSearch = async () => {
     const query = (liveQuery || [p.name, p.problem, p.solution, ...p.features.slice(0, 2).map((f) => f.name)].filter(Boolean).join(' ')).trim();
@@ -401,7 +413,7 @@ export default function PriorArtLab() {
             GitHub search uses the BuildScope backend. Web/product, paper/dataset, and official-source checks remain unconnected. No credentials belong in this client.
           </p>
           <details className="mt12">
-            <summary className="mono xs" style={{ cursor: 'pointer', color: 'var(--ink-2)' }}>WHAT A LIVE SEARCH WOULD DO</summary>
+            <summary className="mono xs" style={{ cursor: 'pointer', color: 'var(--ink-2)' }}>HOW SEARCH WORKS</summary>
             <ol className="xs muted" style={{ marginTop: 8, paddingLeft: 16 }}>
               <li>Extract problem, users, features, stack, and expected outcome.</li>
               <li>Generate alternative-phrased and technical queries.</li>
