@@ -6,6 +6,11 @@ BuildScope AI helps students, hackathon teams, developers, and founders investig
 
 > **Evidence first.** BuildScope organises findings and highlights gaps; it does not guarantee originality, feasibility, or project success. Treat demo records and unreviewed search results as leads—not verified evidence.
 
+## Product Demo
+
+Watch the [BuildScope AI walkthrough video on Google Drive](https://drive.google.com/file/d/128Fw6qudJEo3YPyIPSDlP2f4tMnScx_v/view?usp=sharing) for a walkthrough of the product experience.
+
+
 ## At a glance
 
 - **Frontend:** React 18, Vite, JavaScript
