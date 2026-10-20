@@ -8,6 +8,7 @@ import { repositoryFinding, existingSolution, evidenceRecord, feature } from '..
 import { EVIDENCE_STATUS, OVERLAP, VERIFICATION_OPTIONS, SOURCE_KINDS } from '../../lib/constants';
 import { COMPARISON_LEVELS, COMPARISON_DIMENSIONS } from '../../lib/report';
 import { fmtDate, hostOf, safeHref } from '../../lib/format';
+import { createRepositorySearchProvider } from '../../services/providers';
 
 const KIND_ICON = { product: Package, paper: FileText, dataset: Database, api: Plug, hackathon: Trophy };
 
@@ -212,6 +213,10 @@ export default function PriorArtLab() {
   const [sort, setSort] = useState('relevance');
   const [modal, setModal] = useState(null);
   const [claimFeature, setClaimFeature] = useState(null);
+  const [liveQuery, setLiveQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [lastSearch, setLastSearch] = useState(null);
 
   const p = project;
   const repos = p?.repositories || [];
@@ -270,6 +275,33 @@ export default function PriorArtLab() {
     `${p.stack.slice(0, 2).join(' ')} ${p.targetUsers[0] || 'app'}`.trim(),
     p.solution ? p.solution.split(/\s+/).slice(0, 7).join(' ') : null,
   ].filter(Boolean);
+
+  const runLiveSearch = async () => {
+    const query = (liveQuery || [p.name, p.problem, p.solution, ...p.features.slice(0, 2).map((f) => f.name)].filter(Boolean).join(' ')).trim();
+    if (query.length < 2) { setSearchError('Enter a project name or search phrase first.'); return; }
+    setSearching(true); setSearchError('');
+    try {
+      const payload = await createRepositorySearchProvider().search({ query, limit: 10 });
+      const existingUrls = new Set((p.repositories || []).map((r) => r.url).filter(Boolean));
+      let added = 0;
+      for (const item of (payload.items || [])) {
+        if (!item.url || existingUrls.has(item.url)) continue;
+        const lead = repositoryFinding({
+          name: item.name, owner: item.owner, description: item.description, platform: 'GitHub',
+          url: item.url, language: item.language, topics: item.topics || [], stars: item.stars,
+          forks: item.forks, lastUpdated: item.lastUpdated, licence: item.licence || 'Unknown',
+          docs: 'Not checked', retrieval: 'live', checkedAt: item.checkedAt || payload.checkedAt || new Date().toISOString(),
+          limitations: item.limitations || 'Public repository metadata only; documentation has not been independently reviewed.',
+          demo: false,
+        });
+        actions.addItem('repositories', lead, `Live GitHub lead added: ${lead.name}.`);
+        existingUrls.add(item.url); added += 1;
+      }
+      setLastSearch({ query, count: (payload.items || []).length, added, checkedAt: payload.checkedAt || new Date().toISOString() });
+      pushToast(`GitHub search complete: ${(payload.items || []).length} result(s), ${added} new lead(s) saved.`);
+    } catch (error) { setSearchError(error?.message || 'Live search failed. Check the backend deployment and try again.'); }
+    finally { setSearching(false); }
+  };
 
   const copyQuery = async (text) => {
     try {
@@ -338,10 +370,13 @@ export default function PriorArtLab() {
 
       <div className="grid g-2-1 mb16" style={{ alignItems: 'stretch' }}>
         <Card title="Search plan" eyebrow="Derived locally from your brief" className="mb0">
-          <p className="small muted">
-            A live search integration will turn the brief into multiple queries, deduplicate results, and compare documented
-            capabilities. Until a provider is connected, use this plan to search manually.
-          </p>
+          <p className="small muted">Search public GitHub repositories live. Results are saved as leads; they do not cover patents or commercial products.</p>
+          <div className="row mt12" style={{ gap: 8, alignItems: 'stretch' }}>
+            <input aria-label="GitHub search query" value={liveQuery} onChange={(e) => setLiveQuery(e.target.value)} placeholder={p.name || 'Enter a search phrase'} style={{ flex: 1, minWidth: 0 }} />
+            <Btn variant="primary" onClick={runLiveSearch} disabled={searching}>{searching ? 'Searching…' : 'Search GitHub'}</Btn>
+          </div>
+          {searchError && <div className="mt12"><Notice tone="danger">{searchError}</Notice></div>}
+          {lastSearch && <div className="mt12"><Notice tone="ok">Live search ran for “{lastSearch.query}”: {lastSearch.count} result(s), {lastSearch.added} new lead(s) saved. Documentation still needs review.</Notice></div>}
           <div className="stack-sm mt12">
             {searchPlan.map((query, i) => (
               <div key={`${query}-${i}`} className="row nowrap" style={{ gap: 8 }}>
@@ -351,20 +386,19 @@ export default function PriorArtLab() {
               </div>
             ))}
           </div>
-          <div className="mt12"><Notice tone="warn"><b>Search not executed.</b> Queries are suggestions generated from saved fields. No request leaves this browser.</Notice></div>
+          <div className="mt12"><Notice tone={lastSearch ? 'ok' : 'warn'}><b>{lastSearch ? 'Live GitHub search executed.' : 'Search plan only.'}</b> {lastSearch ? 'The request went through the BuildScope backend to the public GitHub API.' : 'Copying a suggested query does not execute it; use Search GitHub to run a search.'}</Notice></div>
         </Card>
 
         <Card title="Provider readiness" eyebrow="Future integration" className="mb0">
           <div className="stack-sm">
-            <div className="spread small"><span className="muted">Repository search</span><TagBadge tone="orange">NOT CONNECTED</TagBadge></div>
+            <div className="spread small"><span className="muted">Repository search</span><TagBadge tone={lastSearch ? 'green' : 'orange'}>{lastSearch ? 'LIVE SEARCH USED' : 'CONNECTED — RUN A TEST'}</TagBadge></div>
             <div className="spread small"><span className="muted">Web / product search</span><TagBadge tone="orange">NOT CONNECTED</TagBadge></div>
             <div className="spread small"><span className="muted">Paper & dataset search</span><TagBadge tone="orange">NOT CONNECTED</TagBadge></div>
             <div className="spread small"><span className="muted">Official source check</span><TagBadge tone="orange">NOT CONNECTED</TagBadge></div>
           </div>
           <div className="line" />
           <p className="xs muted mb0">
-            Interfaces live in <code>src/services/providers.js</code>. Secret-bearing requests must run through a backend
-            or server function; no credentials belong in this client.
+            GitHub search uses the BuildScope backend. Web/product, paper/dataset, and official-source checks remain unconnected. No credentials belong in this client.
           </p>
           <details className="mt12">
             <summary className="mono xs" style={{ cursor: 'pointer', color: 'var(--ink-2)' }}>WHAT A LIVE SEARCH WOULD DO</summary>
