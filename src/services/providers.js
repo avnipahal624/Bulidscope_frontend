@@ -22,7 +22,7 @@ export const SOURCE_CAPABILITIES = {
     supports: ['repositories', 'repository metadata', 'topics', 'licences', 'stars/forks'],
     limitations: ['public repositories only', 'rate limits', 'not a general web search'],
     configuration: ['GITHUB_TOKEN server-side'],
-    status: 'not-connected',
+    status: 'connected',
   },
   fishapi: {
     label: 'FishAPI — general web / source retrieval',
@@ -67,11 +67,26 @@ function unimplemented(id, label, method) {
   };
 }
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://buildscope-backend.onrender.com/api').replace(/\\/$/, '');
+
+async function searchGitHubRepositories({ query, limit = 10 } = {}) {
+  const cleanQuery = String(query || '').trim();
+  if (cleanQuery.length < 2) throw new Error('Enter at least 2 characters to search public GitHub repositories.');
+  const response = await fetch(`${API_BASE_URL}/prior-art/repositories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: cleanQuery, limit: Math.min(Math.max(Number(limit) || 10, 1), 25) }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.detail || `Repository search failed (HTTP ${response.status}).`);
+  return payload;
+}
+
 export function createRepositorySearchProvider() {
   return {
     id: 'github',
-    live: false,
-    search: unimplemented('github', 'Repository search', 'search'),
+    live: true,
+    search: searchGitHubRepositories,
     fetchMetadata: unimplemented('github', 'Repository search', 'fetchMetadata'),
     fetchDocs: unimplemented('github', 'Repository search', 'fetchDocs'),
   };
