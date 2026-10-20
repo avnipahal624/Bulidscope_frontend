@@ -67,7 +67,7 @@ function unimplemented(id, label, method) {
   };
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://buildscope-backend.onrender.com/api').replace(/\\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://buildscope-backend.onrender.com/api').replace(/\/$/, '');
 
 async function searchGitHubRepositories({ query, limit = 10 } = {}) {
   const cleanQuery = String(query || '').trim();
