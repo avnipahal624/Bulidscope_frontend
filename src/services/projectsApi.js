@@ -1,4 +1,3 @@
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 async function request(path, options = {}) {
@@ -51,4 +50,26 @@ export function createBackendProject(project) {
       ).filter(Boolean),
     }),
   });
+}
+
+export function startResearchAnalysis(backendProjectId) {
+  if (!backendProjectId) {
+    throw new Error('This project has no linked backend record. Create a new project to run live research.');
+  }
+  return request(`/projects/${encodeURIComponent(backendProjectId)}/research`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function getResearchJob(jobId) {
+  return request(`/jobs/${encodeURIComponent(jobId)}`);
+}
+
+export function getSimilarProjects(backendProjectId) {
+  return request(`/projects/${encodeURIComponent(backendProjectId)}/similar-projects`);
+}
+
+export function getProjectComparisons(backendProjectId) {
+  return request(`/projects/${encodeURIComponent(backendProjectId)}/comparisons`);
 }
