@@ -1,19 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { Play, RefreshCw, LoaderCircle } from 'lucide-react';
-import { startResearchAnalysis, getResearchJob, getSimilarProjects } from '../../services/projectsApi';
+import { startResearchAnalysis, getResearchJob, getSimilarProjects, getProjectComparisons } from '../../services/projectsApi';
 import { Btn, Card, Notice } from '../../components/ui';
 
 export default function ResearchAnalysisPanel({ project }) {
   const [job, setJob] = useState(null);
   const [results, setResults] = useState([]);
+  const [comparisons, setComparisons] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const backendId = project?.backendId;
 
   async function loadResults() {
     if (!backendId) return;
-    const items = await getSimilarProjects(backendId);
+    const [items, comparisonItems] = await Promise.all([
+      getSimilarProjects(backendId),
+      getProjectComparisons(backendId),
+    ]);
     setResults(Array.isArray(items) ? items : []);
+    setComparisons(Array.isArray(comparisonItems) ? comparisonItems : []);
   }
 
   async function runResearch() {
@@ -95,6 +100,20 @@ export default function ResearchAnalysisPanel({ project }) {
           ))}
         </div>
       ) : <p className="small muted mb0 mt8">No similar-project records loaded yet. Run research or refresh after a job completes.</p>}
+      <div className="line" />
+      <div className="spread"><strong className="small">Research comparisons</strong><span className="mono xs muted">{comparisons.length} available</span></div>
+      {comparisons.length ? (
+        <div className="stack-sm mt8">
+          {comparisons.slice(0, 5).map((item, index) => (
+            <div className="card card-tight" key={item.id || index}>
+              {item.explanation && <p className="small mb0">{item.explanation}</p>}
+              {Array.isArray(item.possible_gaps) && item.possible_gaps.length > 0 && (
+                <div className="mt8"><div className="eyebrow plain">Possible gaps to investigate</div><ul className="small">{item.possible_gaps.map((gap, i) => <li key={i}>{typeof gap === 'string' ? gap : JSON.stringify(gap)}</li>)}</ul></div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : <p className="small muted mb0 mt8">No comparison records available yet. These may appear after the research run finishes.</p>}
     </Card>
   );
 }
