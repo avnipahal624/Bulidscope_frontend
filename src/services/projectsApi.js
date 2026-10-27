@@ -58,7 +58,6 @@ export function startResearchAnalysis(backendProjectId) {
   }
   return request(`/projects/${encodeURIComponent(backendProjectId)}/research`, {
     method: 'POST',
-    body: JSON.stringify({}),
   });
 }
 
