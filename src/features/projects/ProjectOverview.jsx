@@ -8,6 +8,7 @@ import {
   buildMissions, missionProgress, activeMission, coverageOf, evidenceQuality, complianceSummary, nextAction, highPriorityBlockers,
 } from '../../lib/scoring';
 import { fmtDate, relativeTime } from '../../lib/format';
+import ResearchAnalysisPanel from './ResearchAnalysisPanel';
 
 export default function ProjectOverview() {
   const project = useRouteProject();
@@ -65,6 +66,8 @@ export default function ProjectOverview() {
           </div>
         </div>
       </div>
+
+      <div className="mb16"><ResearchAnalysisPanel project={p} /></div>
 
       <div className="grid g-2-1">
         <div className="stack">
