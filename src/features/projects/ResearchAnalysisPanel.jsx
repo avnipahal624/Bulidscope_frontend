@@ -44,9 +44,24 @@ export default function ResearchAnalysisPanel({ project }) {
         if (cancelled) return;
         setJob(current);
         const status = String(current.status || '').toLowerCase();
-        if (status === 'completed') {
+        if (status === 'completed' || status === 'completed_with_errors') {
           setBusy(false);
-          try { await loadResults(); } catch (err) { setError(err.message || 'Research completed, but results could not be loaded.'); }
+          try {
+            await loadResults();
+          } catch (err) {
+            setError(err.message || 'Research finished, but results could not be loaded.');
+            return;
+          }
+          if (status === 'completed_with_errors') {
+            const logErrors = Array.isArray(current.log)
+              ? current.log.filter((entry) => entry.level === 'error').map((entry) => entry.message)
+              : [];
+            setError(
+              logErrors[0]
+                ? 'Research finished with partial results: ' + logErrors[0]
+                : 'Research finished with some errors. Available partial results are shown below.'
+            );
+          }
           return;
         }
         if (status === 'failed') {
