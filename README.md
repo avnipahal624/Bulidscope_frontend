@@ -19,6 +19,7 @@ Watch the [BuildScope AI walkthrough video on Google Drive](https://drive.google
 - **Reports:** jsPDF and jsPDF AutoTable
 - **Fonts:** self-hosted Fontsource packages
 - **Live repository search:** GitHub public repository search through the BuildScope backend
+- **Live hackathon discovery:** TinyFish web search through the BuildScope backend; listings remain unverified until checked against an organiser source
 - **Workspace storage:** browser-local persistence
 - **Browser verification:** Playwright scripts
 
@@ -59,6 +60,7 @@ The Prior Art Lab can send a repository-search request to the BuildScope backend
 
 - GitHub search covers public repository metadata; it does not search private repositories, patents, every commercial product, unpublished research, or all existing work.
 - Search relevance is a locally computed heuristic—not a live ranking, proof of feature equivalence, or legal novelty assessment.
+- Hackathon Radar can search live web results through TinyFish. Search hits are leads only; dates, eligibility, fees, and registration status must be checked against the organiser's source before relying on them.
 - Returned leads need documentation and functionality review before they should be treated as evidence.
 - Web/product search, paper/dataset search, and official-source verification are not connected unless separately implemented and configured.
 - Do not put API keys or other secrets in frontend environment variables or browser code. Secret-bearing integrations belong on the server.

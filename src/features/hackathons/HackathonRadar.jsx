@@ -8,10 +8,10 @@ import { usePageTitle } from '../../app/hooks';
 import {
   Badge, Btn, Card, EmptyState, Field, Modal, Notice, PageHead, StatusBadge,
 } from '../../components/ui';
-import { DEMO_HACKATHONS } from '../../data/demo';
 import { HACKATHON_STATUS, HACKATHON_VERIFICATION } from '../../lib/constants';
 import { daysUntil, fmtDate, safeHref } from '../../lib/format';
 import { uid, nowIso } from '../../lib/id';
+import { searchLiveHackathons } from '../../services/hackathonsApi';
 
 const FIELDS = ['Dates', 'Registration deadline', 'Format', 'Location', 'Theme', 'Team size', 'Eligibility', 'Cost'];
 const CONFIRMABLE_COST = ['Unconfirmed', 'Free', 'Paid'];
@@ -242,11 +242,59 @@ export default function HackathonRadar() {
   const [filters, setFilters] = useState({ time: '', reg: '', format: '', domain: '', participation: '', cost: '', team: '', from: '', to: '' });
   const [sort, setSort] = useState('soonest');
   const [modal, setModal] = useState(null);
+  const [liveQuery, setLiveQuery] = useState('hackathons open for registration students India');
+  const [liveResults, setLiveResults] = useState([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState('');
+  const [liveNote, setLiveNote] = useState('');
   usePageTitle('Hackathon Radar');
 
-  const events = useMemo(() => [...state.hackathons, ...DEMO_HACKATHONS], [state.hackathons]);
+  const events = useMemo(() => {
+    const savedUrls = new Set(state.hackathons.map((event) => event.url).filter(Boolean));
+    const discovered = liveResults
+      .filter((hit) => !savedUrls.has(hit.url))
+      .map((hit) => ({
+        ...hit,
+        organiser: 'Not confirmed',
+        registrationUrl: '',
+        startsAt: '',
+        endsAt: '',
+        registrationDeadline: '',
+        format: 'Unknown',
+        location: 'Unknown',
+        theme: '',
+        participation: 'Unknown',
+        teamSize: 'Unknown',
+        eligibility: 'Unknown',
+        cost: 'Unconfirmed',
+        fieldsConfirmed: [],
+        verification: 'unverified',
+        demo: false,
+        source: 'live-search',
+      }));
+    return [...state.hackathons, ...discovered];
+  }, [state.hackathons, liveResults]);
   const domains = [...new Set(events.flatMap((e) => e.domains || []))];
   const project = state.projects.find((p) => p.id === state.activeProjectId) || null;
+
+  const runLiveSearch = async (event) => {
+    event?.preventDefault();
+    if (liveQuery.trim().length < 2) {
+      setLiveError('Enter at least 2 characters to search.');
+      return;
+    }
+    setLiveLoading(true);
+    setLiveError('');
+    try {
+      const payload = await searchLiveHackathons(liveQuery.trim());
+      setLiveResults(payload.results || []);
+      setLiveNote(payload.note || 'Search results are leads; confirm details on the organizer source.');
+    } catch (error) {
+      setLiveError(error.message || 'Live search failed. Try again in a moment.');
+    } finally {
+      setLiveLoading(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -322,16 +370,27 @@ export default function HackathonRadar() {
       <div className="demo-banner" role="note">
         <AlertTriangle size={15} aria-hidden="true" />
         <div>
-          <b>DEMO DATA — NOT LIVE VERIFIED.</b> Every seeded event below is a simulated fixture with a fictional organiser.
-          Dates are illustrative, not real deadlines, and no event is described as accepting registrations. Add a live listing
-          yourself after checking the official source.
+          <b>Live search leads are not verified listings.</b> Dates, eligibility, fees, and open registration status stay unknown until
+          you confirm them on the event organiser’s page.
         </div>
       </div>
 
+      <form className="toolbar mb16" onSubmit={runLiveSearch}>
+        <div className="search" style={{ flex: 1, minWidth: 240 }}>
+          <Search size={14} aria-hidden="true" />
+          <input value={liveQuery} onChange={(e) => setLiveQuery(e.target.value)} placeholder="Search live hackathons…" aria-label="Search live hackathons" />
+        </div>
+        <Btn variant="primary" type="submit" disabled={liveLoading}>
+          <Search size={13} /> {liveLoading ? 'Searching live web…' : 'Search live events'}
+        </Btn>
+      </form>
+      {liveError && <div className="mb16"><Notice tone="danger">{liveError}</Notice></div>}
+      {liveNote && <div className="mb16"><Notice>{liveNote}</Notice></div>}
+
       <div className="grid g4 mb16">
         {[
-          ['Simulated listings', String(DEMO_HACKATHONS.length)],
-          ['Manual listings', String(state.hackathons.length)],
+          ['Live search leads', String(liveResults.length)],
+          ['Saved listings', String(state.hackathons.length)],
           ['Tracked opportunities', String(tracked.length)],
           ['Verified events', String(events.filter((e) => e.verification === 'verified').length)],
         ].map(([l, v]) => (
@@ -453,6 +512,7 @@ export default function HackathonRadar() {
                 <div className="spread" style={{ alignItems: 'flex-start', gap: 6 }}>
                   <div className="row" style={{ gap: 5 }}>
                     <StatusBadge meta={v} />
+                    {String(e.source || '').includes('live-search') && <Badge tone="demo">LIVE LEAD</Badge>}
                     {e.demo && <Badge tone="demo">DEMO</Badge>}
                   </div>
                   {isTracked && <Badge tone="sage">TRACKED</Badge>}
@@ -483,6 +543,7 @@ export default function HackathonRadar() {
                   <div className="xs muted"><MapPin size={11} style={{ verticalAlign: -1 }} /> {e.theme || 'Theme not recorded'}</div>
                 </div>
 
+                {e.source === 'live-search' && e.snippet && <div className="evidence-strip"><div className="mono xs muted">SEARCH SNIPPET · REVIEW SOURCE</div><div className="xs">{e.snippet}</div></div>}
                 {e.whyMatch && <div className="evidence-strip"><div className="mono xs muted">WHY IT MAY MATCH</div><div className="xs">{e.whyMatch}</div></div>}
 
                 <div className="xs muted" style={{ lineHeight: 1.5 }}>
@@ -492,13 +553,17 @@ export default function HackathonRadar() {
 
                 <div className="row between" style={{ marginTop: 'auto', paddingTop: 6 }}>
                   <div className="source-line">
-                    {safeHref(e.url) ? <a href={e.url} target="_blank" rel="noopener noreferrer nofollow">Official page <ExternalLink size={10} /></a> : <span>No official link recorded</span>}
+                    {safeHref(e.url) ? <a href={e.url} target="_blank" rel="noopener noreferrer nofollow">{String(e.source || '').includes('live-search') ? 'Open source' : 'Official page'} <ExternalLink size={10} /></a> : <span>No official link recorded</span>}
                   </div>
                   <div className="row" style={{ gap: 4 }}>
+                    {e.source === 'live-search' && <Btn variant="ghost" size="xs" onClick={() => {
+                      actions.addHackathon({ ...e, id: uid('hk'), source: 'saved-live-search', domains: [], tech: [] });
+                      pushToast('Live search lead saved as unverified. Confirm its details on the source page.');
+                    }}>Add to radar</Btn>}
                     {e.demo && <Btn variant="quiet" size="xs" onClick={() => setModal({ type: 'details', event: e })} aria-label="Why this is demo data"><ShieldCheck size={12} /></Btn>}
-                    <Btn variant={isTracked ? 'ghost' : 'primary'} size="xs" onClick={() => setModal({ type: 'track', event: e })}>
+                    {e.source !== 'live-search' && <Btn variant={isTracked ? 'ghost' : 'primary'} size="xs" onClick={() => setModal({ type: 'track', event: e })}>
                       {isTracked ? 'Manage' : 'Save'} <ArrowRight size={11} />
-                    </Btn>
+                    </Btn>}
                   </div>
                 </div>
               </article>
@@ -509,9 +574,8 @@ export default function HackathonRadar() {
 
       <div className="mt16">
         <Notice tone="warn">
-          <b>Verification is per field.</b> A listing marked verified means the confirmed fields (dates, deadline, format, eligibility, cost)
-          were checked against an official source on the recorded date. Everything else remains unknown. Unverified demo listings must not
-          drive real deadline decisions.
+          <b>Verification is per field.</b> A live search result is only a lead. Confirm dates, deadline, format, eligibility, and cost against
+          the organiser’s official source before relying on it for an application.
         </Notice>
       </div>
 
